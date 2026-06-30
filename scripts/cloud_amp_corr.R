@@ -61,7 +61,8 @@ cols_to_average <- c("DAPI_Area", "DAPI_Int.Intensity", "Meg3_Area", "Meg3_Int.I
                      "Snhg14_Area", "Snhg14_Int.Intensity", "Xist_Area", "Xist_Int.Intensity",
                      "Tri.coloc_Area", "Tri.coloc_Int.Intensity", "Snhg14_Xist_Area",
                      "Snhg14_Xist_Int.Intensity", "Meg3_Snhg14_Area", "Meg3_Snhg14_Int.Intensity",
-                     "Meg3_Xist_Area", "Meg3_Xist_Int.Intensity")
+                     "Meg3_Xist_Area", "Meg3_Xist_Int.Intensity",
+                     "Meg3_norm", "Snhg14_norm", "Xist_norm", "Tri.coloc_norm")  # added normalized cols
 
 animal_avg <- cloud %>%
   group_by(Animal_ID, Sex, Genotype, Light_Expo) %>%
@@ -69,11 +70,22 @@ animal_avg <- cloud %>%
             .groups = "drop")
 
 animal_avg <- animal_avg %>%
-  mutate(Genotype = factor(Genotype, levels = c("WT", "PWS", "COMP"))) %>%  # adjust labels to match yours
+  mutate(Genotype = factor(Genotype, levels = c("WT", "PWS", "COMP"))) %>%
   arrange(Genotype)
 
+library(stringr)
+library(tidyverse)
+
+animal_avg <- animal_avg %>%
+  mutate(Sex = case_when(
+    str_detect(Sex, "^Male") ~ "M",
+    str_detect(Sex, "^Female") ~ "F",
+    TRUE ~ Sex
+  )) %>%
+  rename(ID = Animal_ID,
+         Cycle = Light_Expo)
+
 View(animal_avg)
-# Write a CSV file containing the calculated average of all cells per animal.
 write.csv(animal_avg, "animal_averages.csv", row.names = FALSE)
 
 cell_counts <- cloud %>%
@@ -82,13 +94,55 @@ cell_counts <- cloud %>%
 
 
 
-# 
-library(ggplot2)
-ggplot(animal_avg, aes(x = DAPI_Area, fill = Sex)) +
-  geom_histogram(bins = 30, color = "black") +
-  facet_grid(Sex ~ Genotype) +
-  labs(title = "Distribution of DAPI_Area by Genotype and Sex",
-       x = "DAPI_Area", y = "Count") +
-  theme_minimal()
+# Plot using the average calculated Meg3_norm (normalized to area)
+# Meg3_RNA cloud size plot
+ggplot(animal_avg, aes(x = Genotype, y = Meg3_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.52, dodge.width = 1.0),
+              size = 2.5, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 1.0), outlier.shape = NA, alpha = 0.3, color = "black") +
+  #scale_y_continuous(limits = c(0, 125), breaks = seq(0, 125, by = 25)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "Meg3 RNA-cloud size (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
 
 
+
+# Snhg14_RNA cloud size plot
+ggplot(animal_avg, aes(x = Genotype, y = Snhg14_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.55, dodge.width = 1.0),
+              size = 2.5, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 1.0), outlier.shape = NA, alpha = 0.3, color = "black") +
+  #scale_y_continuous(limits = c(0, 125), breaks = seq(0, 125, by = 25)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "Snhg14 RNA-cloud size (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
+
+
+
+# Xist_RNA cloud size plot
+animal_avg %>%
+  filter(Sex == "F") %>%
+  ggplot(aes(x = Genotype, y = Xist_norm)) +
+  geom_jitter(width = 0.5, size = 2.0, alpha = 1.0, color = "pink") +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, color = "black", fill = "pink") +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) +
+  labs(x = "Genotype", y = "Xist RNA-cloud size (% nuclear area)") +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  ) 
