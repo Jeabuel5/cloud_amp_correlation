@@ -56,8 +56,39 @@ cloud <- cloud %>%
 
 
 
+# Calculate the average value per Animal_ID
+cols_to_average <- c("DAPI_Area", "DAPI_Int.Intensity", "Meg3_Area", "Meg3_Int.Intensity",
+                     "Snhg14_Area", "Snhg14_Int.Intensity", "Xist_Area", "Xist_Int.Intensity",
+                     "Tri.coloc_Area", "Tri.coloc_Int.Intensity", "Snhg14_Xist_Area",
+                     "Snhg14_Xist_Int.Intensity", "Meg3_Snhg14_Area", "Meg3_Snhg14_Int.Intensity",
+                     "Meg3_Xist_Area", "Meg3_Xist_Int.Intensity")
+
+animal_avg <- cloud %>%
+  group_by(Animal_ID, Sex, Genotype, Light_Expo) %>%
+  summarise(across(all_of(cols_to_average), \(x) mean(x, na.rm = TRUE)),
+            .groups = "drop")
+
+animal_avg <- animal_avg %>%
+  mutate(Genotype = factor(Genotype, levels = c("WT", "PWS", "COMP"))) %>%  # adjust labels to match yours
+  arrange(Genotype)
+
+View(animal_avg)
+# Write a CSV file containing the calculated average of all cells per animal.
+write.csv(animal_avg, "animal_averages.csv", row.names = FALSE)
+
+cell_counts <- cloud %>%
+  count(Animal_ID, Site.ID)
+
+
+
+
 # 
-
-
+library(ggplot2)
+ggplot(animal_avg, aes(x = DAPI_Area, fill = Sex)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_grid(Sex ~ Genotype) +
+  labs(title = "Distribution of DAPI_Area by Genotype and Sex",
+       x = "DAPI_Area", y = "Count") +
+  theme_minimal()
 
 
