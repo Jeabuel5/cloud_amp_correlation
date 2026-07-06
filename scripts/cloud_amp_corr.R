@@ -5,11 +5,16 @@ library(tibble)
 
 
 
-
 # This contains image anlaysis using high-content imager
 cloud <- read_csv("data/combined_data.csv", show_col_types = FALSE)
 # This file contains the running wheel amplitude data from Jenny
 amp <- read_excel("data/Running wheel Cohort 1-21 combined cosinor data.xlsx", sheet = 1)
+
+
+# Normalize the lncRNA_Pairs
+cloud$Meg3_Snhg14_Area_norm <- (cloud$Meg3_Snhg14_Area / cloud$DAPI_Area) * 100
+cloud$Meg3_Xist_Area_norm   <- (cloud$Meg3_Xist_Area / cloud$DAPI_Area) * 100
+cloud$Snhg14_Xist_Area_norm <- (cloud$Snhg14_Area / cloud$DAPI_Area) * 100
 
 
 
@@ -18,8 +23,8 @@ cloud <- cloud %>%
   #rename(Genotype = Genotypes) %>%
   mutate(Genotype = sub("\\s\\d+$", "", Genotype),
          Genotype = recode(Genotype, "DEL" = "PWS"))
-View(cloud)
 
+View(cloud)
 
 
 # Rename "Sex" column in cloud~ instead of Male1, we replace the actual animal number for each samples
@@ -62,7 +67,8 @@ cols_to_average <- c("DAPI_Area", "DAPI_Int.Intensity", "Meg3_Area", "Meg3_Int.I
                      "Tri.coloc_Area", "Tri.coloc_Int.Intensity", "Snhg14_Xist_Area",
                      "Snhg14_Xist_Int.Intensity", "Meg3_Snhg14_Area", "Meg3_Snhg14_Int.Intensity",
                      "Meg3_Xist_Area", "Meg3_Xist_Int.Intensity",
-                     "Meg3_norm", "Snhg14_norm", "Xist_norm", "Tri.coloc_norm")  # added normalized cols
+                     "Meg3_norm", "Snhg14_norm", "Xist_norm", "Tri.coloc_norm", "Meg3_Xist_Area_norm",
+                     "Meg3_Snhg14_Area_norm", "Snhg14_Xist_Area_norm")  # added normalized cols
 
 animal_avg <- cloud %>%
   group_by(Animal_ID, Sex, Genotype, Light_Expo) %>%
@@ -92,15 +98,16 @@ cell_counts <- cloud %>%
   count(Animal_ID, Site.ID)
 
 
-
+animal_avg <- animal_avg %>%
+  mutate(Cycle = factor(Cycle, levels = c("12", "11")))
 
 # Plot using the average calculated Meg3_norm (normalized to area)
 # Meg3_RNA cloud size plot
 ggplot(animal_avg, aes(x = Genotype, y = Meg3_norm, fill = Sex, color = Sex)) +
-  geom_jitter(position = position_jitterdodge(jitter.width = 0.52, dodge.width = 1.0),
-              size = 2.5, alpha = 1.0) +
-  geom_boxplot(position = position_dodge(width = 1.0), outlier.shape = NA, alpha = 0.3, color = "black") +
-  #scale_y_continuous(limits = c(0, 125), breaks = seq(0, 125, by = 25)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 50), breaks = seq(0, 50, by = 10)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
@@ -116,10 +123,10 @@ ggplot(animal_avg, aes(x = Genotype, y = Meg3_norm, fill = Sex, color = Sex)) +
 
 # Snhg14_RNA cloud size plot
 ggplot(animal_avg, aes(x = Genotype, y = Snhg14_norm, fill = Sex, color = Sex)) +
-  geom_jitter(position = position_jitterdodge(jitter.width = 0.55, dodge.width = 1.0),
-              size = 2.5, alpha = 1.0) +
-  geom_boxplot(position = position_dodge(width = 1.0), outlier.shape = NA, alpha = 0.3, color = "black") +
-  #scale_y_continuous(limits = c(0, 125), breaks = seq(0, 125, by = 25)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 0.5)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
@@ -137,12 +144,95 @@ ggplot(animal_avg, aes(x = Genotype, y = Snhg14_norm, fill = Sex, color = Sex)) 
 animal_avg %>%
   filter(Sex == "F") %>%
   ggplot(aes(x = Genotype, y = Xist_norm)) +
-  geom_jitter(width = 0.5, size = 2.0, alpha = 1.0, color = "pink") +
-  geom_boxplot(outlier.shape = NA, alpha = 0.7, color = "black", fill = "pink") +
+  geom_boxplot(outlier.shape = NA, alpha = 0.4, color = "black", fill = "pink") +
+  geom_jitter(width = 0.0, size = 3.0, alpha = 1.0, color = "black") +
+  scale_y_continuous(breaks = seq(0, 15, by = 5)) +
+  coord_cartesian(ylim = c(NA, 15)) +
   facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) +
   labs(x = "Genotype", y = "Xist RNA-cloud size (% nuclear area)") +
   theme_minimal() +
   theme(
     panel.grid = element_blank(),
     panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
-  ) 
+  )
+
+
+
+# ----------------------
+# Meg3_Xist_Area_norm COLOCALIZATION
+ggplot(animal_avg, aes(x = Genotype, y = Meg3_Xist_Area_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 1)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "Meg3_Xist colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
+
+
+
+# Meg3_Snhg14_Area_norm COLOCALIZATION
+ggplot(animal_avg, aes(x = Genotype, y = Meg3_Snhg14_Area_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "Meg3_Snhg14 colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
+
+
+
+# Snhg14_Xist_Area_norm COLOCALIZATION
+ggplot(animal_avg, aes(x = Genotype, y = Snhg14_Xist_Area_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "Snhg14_Xist colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
+
+
+
+# Tri.coloc_norm COLOCALIZATION
+ggplot(animal_avg, aes(x = Genotype, y = Tri.coloc_norm, fill = Sex, color = Sex)) +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+              size = 3.0, alpha = 1.0) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
+  scale_y_continuous(limits = c(0, 2), breaks = seq(0, 2, by = 0.5)) +
+  scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
+  facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
+  labs(x = "Genotype", y = "All probes colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6)
+  )
+
+
+
+
