@@ -105,7 +105,11 @@ animal_avg <- animal_avg %>%
 # Meg3_RNA cloud size plot
 ggplot(animal_avg, aes(x = Genotype, y = Meg3_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 50), breaks = seq(0, 50, by = 10)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
@@ -124,7 +128,11 @@ ggplot(animal_avg, aes(x = Genotype, y = Meg3_norm, fill = Sex, color = Sex)) +
 # Snhg14_RNA cloud size plot
 ggplot(animal_avg, aes(x = Genotype, y = Snhg14_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 0.5)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
@@ -159,10 +167,17 @@ animal_avg %>%
 
 
 # ----------------------
+
+
+
 # Meg3_Xist_Area_norm COLOCALIZATION
 ggplot(animal_avg, aes(x = Genotype, y = Meg3_Xist_Area_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 1)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
@@ -181,13 +196,17 @@ ggplot(animal_avg, aes(x = Genotype, y = Meg3_Xist_Area_norm, fill = Sex, color 
 # Meg3_Snhg14_Area_norm COLOCALIZATION
 ggplot(animal_avg, aes(x = Genotype, y = Meg3_Snhg14_Area_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   scale_color_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
   facet_wrap(~ Cycle, labeller = labeller(Cycle = c("11" = "11:11", "12" = "12:12"))) + # updated from Sample -> Cycle (confirm this is right)
-  labs(x = "Genotype", y = "Meg3_Snhg14 colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
+  labs(x = "Genotype", y = "Meg3--Snhg14 colocalization (% nuclear area)", fill = "Sex", color = "Sex") +
   theme_minimal() +
   theme(
     legend.position = "top",
@@ -200,7 +219,11 @@ ggplot(animal_avg, aes(x = Genotype, y = Meg3_Snhg14_Area_norm, fill = Sex, colo
 # Snhg14_Xist_Area_norm COLOCALIZATION
 ggplot(animal_avg, aes(x = Genotype, y = Snhg14_Xist_Area_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
@@ -219,7 +242,11 @@ ggplot(animal_avg, aes(x = Genotype, y = Snhg14_Xist_Area_norm, fill = Sex, colo
 # Tri.coloc_norm COLOCALIZATION
 ggplot(animal_avg, aes(x = Genotype, y = Tri.coloc_norm, fill = Sex, color = Sex)) +
   geom_jitter(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
-              size = 3.0, alpha = 1.0) +
+              shape = 21,
+              color = "black",
+              size = 3.0,
+              stroke = 0.8,
+              alpha = 1.0) +
   geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, alpha = 0.3, color = "black") +
   scale_y_continuous(limits = c(0, 2), breaks = seq(0, 2, by = 0.5)) +
   scale_fill_manual(values = c("F" = "pink", "M" = "#56B4E9")) +
