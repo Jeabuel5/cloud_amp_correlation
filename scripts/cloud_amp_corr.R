@@ -263,3 +263,47 @@ ggplot(animal_avg, aes(x = Genotype, y = Tri.coloc_norm, fill = Sex, color = Sex
 
 
 
+# ------------
+
+# packages
+library(dplyr)
+library(purrr)
+library(broom)
+library(writexl)
+
+# make sure these are factors
+animal_avg$Sex <- factor(animal_avg$Sex)
+animal_avg$Cycle <- factor(animal_avg$Cycle)
+animal_avg$Genotype <- factor(animal_avg$Genotype)
+
+# list of measurements
+measures <- c("Meg3_norm", "Snhg14_norm", "Xist_norm",
+              "Meg3_Snhg14_Area_norm", "Meg3_Xist_Area_norm", "Snhg14_Xist_Area_norm")
+
+# function to run ANOVA and tidy results
+run_anova <- function(response, formula_text, anova_type) {
+  fit <- aov(as.formula(paste(response, formula_text)), data = animal_avg)
+  tidy(fit) %>%
+    mutate(
+      measure = response,
+      model = anova_type
+    )
+}
+
+# 2-way ANOVA: Sex + Cycle
+anova_2way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Cycle", "2-way"))
+
+# 3-way ANOVA: Sex + Cycle + Genotype
+anova_3way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Cycle * Genotype", "3-way"))
+
+# combine into one table
+anova_all <- bind_rows(anova_2way_df, anova_3way_df)
+
+# write to Excel file
+write_xlsx(list(
+  ANOVA_2way = anova_2way_df,
+  ANOVA_3way = anova_3way_df,
+  ANOVA_all = anova_all
+), path = "anova_results.xlsx")
+
+
