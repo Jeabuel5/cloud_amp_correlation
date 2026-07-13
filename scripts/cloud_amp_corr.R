@@ -7,8 +7,12 @@ library(tibble)
 
 # This contains image anlaysis using high-content imager
 cloud <- read_csv("data/combined_data.csv", show_col_types = FALSE)
+
 # This file contains the running wheel amplitude data from Jenny
-amp <- read_excel("data/Running wheel Cohort 1-21 combined cosinor data.xlsx", sheet = 1)
+amp <- read_csv("data/Running_wheel_cosinor_data_cleaned.csv", show_col_types = FALSE)
+amp <- amp %>% rename(Note = `...15`)
+amp <- amp %>% select(-Note)
+write_csv(amp, "data/Running_wheel_cosinor_data_cleaned_v2.csv")
 
 
 # Normalize the lncRNA_Pairs
@@ -78,6 +82,15 @@ animal_avg <- cloud %>%
 animal_avg <- animal_avg %>%
   mutate(Genotype = factor(Genotype, levels = c("WT", "PWS", "COMP"))) %>%
   arrange(Genotype)
+
+# Rename the columns and some labels
+animal_avg <- animal_avg %>% rename(Cohort = ID)
+animal_avg <- animal_avg %>%
+  mutate(Genotype = recode(Genotype,
+                           "WT" = "WT/WT",
+                           "PWS" = "HET/WT",
+                           "COMP" = "HET/TG"
+  ))
 
 library(stringr)
 library(tidyverse)
@@ -291,19 +304,98 @@ run_anova <- function(response, formula_text, anova_type) {
 }
 
 # 2-way ANOVA: Sex + Cycle
-anova_2way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Cycle", "2-way"))
+anova_2way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Genotype", "2-way"))
 
 # 3-way ANOVA: Sex + Cycle + Genotype
-anova_3way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Cycle * Genotype", "3-way"))
+# anova_3way_df <- map_dfr(measures, ~ run_anova(.x, "~ Sex * Cycle * Genotype", "3-way"))
 
 # combine into one table
-anova_all <- bind_rows(anova_2way_df, anova_3way_df)
+anova_all <- bind_rows(anova_2way_df)
 
 # write to Excel file
 write_xlsx(list(
   ANOVA_2way = anova_2way_df,
-  ANOVA_3way = anova_3way_df,
-  ANOVA_all = anova_all
+  #ANOVA_3way = anova_3way_df,
+  #ANOVA_all = anova_all
 ), path = "anova_results.xlsx")
+
+
+
+
+
+# ----------
+# ONLY 2-WAY ANOVA on 12:12
+
+# packages
+library(dplyr)
+library(purrr)
+library(broom)
+library(writexl)
+
+# keep only cycle 12 and make sure factors are set
+animal_avg_cycle12 <- animal_avg %>%
+  filter(Cycle == 12) %>%
+  mutate(
+    Sex = factor(Sex),
+    Genotype = factor(Genotype)
+  )
+
+# list of measurements
+measures <- c("Meg3_norm", "Snhg14_norm", "Xist_norm",
+              "Meg3_Snhg14_Area_norm", "Meg3_Xist_Area_norm", "Snhg14_Xist_Area_norm")
+
+# function to run ANOVA and tidy results
+run_anova <- function(response, formula_text, anova_type, data) {
+  fit <- aov(as.formula(paste(response, formula_text)), data = data)
+  tidy(fit) %>%
+    mutate(
+      measure = response,
+      model = anova_type
+    )
+}
+
+# 2-way ANOVA for cycle 12 only: Sex * Genotype
+anova_2way_df <- map_dfr(
+  measures,
+  ~ run_anova(.x, "~ Sex * Genotype", "2-way_cycle12", animal_avg_cycle12)
+)
+
+# write to Excel file
+write_xlsx(list(
+  ANOVA_2way_cycle12 = anova_2way_df
+), path = "anova_results_cycle12.xlsx")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# --------------------------------------------------------------------------------
+# Correlation Analysis of Meg3 RNA-cloud with RW amplitude
+# 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
