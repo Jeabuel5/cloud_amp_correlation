@@ -382,7 +382,41 @@ write_xlsx(list(
 
 # --------------------------------------------------------------------------------
 # Correlation Analysis of Meg3 RNA-cloud with RW amplitude
-# 
+# Merge amp data with the animal_avg and add the Meg3_norm column to it.
+
+# Rename Cohort back to ID in cloud_subset's source
+animal_avg <- animal_avg %>%
+  rename(ID = Cohort)
+
+# Rebuild cloud_subset with the correct column
+cloud_subset <- animal_avg %>%
+  select(ID, Sex, Cycle, Genotype, Meg3_norm) %>%
+  mutate(Cycle = as.numeric(as.character(Cycle)))
+
+# Join on ID (+ Sex, Cycle, Genotype as extra safety checks)
+merged_data <- amp %>%
+  left_join(cloud_subset, by = c("ID", "Sex", "Cycle", "Genotype"))
+
+sum(!is.na(merged_data$Meg3_norm))
+
+write_csv(merged_data, "data/merged_amp_cloud_data.csv")
+
+
+
+complete_data <- merged_data %>%
+  filter(!is.na(Amplitude_Base) & !is.na(Meg3_norm))
+
+nrow(complete_data)  # should be ~31
+
+cor_test <- cor.test(complete_data$Amplitude_Base, complete_data$Meg3_norm)
+cor_test
+
+
+# This is to check if I need to normalize my data by log transform
+hist(complete_data$Meg3_norm)
+hist(complete_data$Amplitude_Base)
+shapiro.test(complete_data$Meg3_norm)
+shapiro.test(complete_data$Amplitude_Base)
 
 
 
@@ -393,9 +427,167 @@ write_xlsx(list(
 
 
 
+library(ggplot2)
+library(dplyr)
+
+# ---- Set genotype order ----
+geno_order <- c("WT/WT", "HET/WT", "HET/TG")
+
+complete_data <- complete_data %>%
+  mutate(Genotype = factor(Genotype, levels = geno_order))
+
+# ---- Per-genotype correlation stats ----
+cor_by_genotype <- complete_data %>%
+  group_by(Genotype) %>%
+  summarise(
+    r = round(cor(Amplitude_Base, Meg3_norm, use = "complete.obs"), 2),
+    p = signif(cor.test(Amplitude_Base, Meg3_norm)$p.value, 2),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0("r = ", r, ", p = ", p),
+    facet_label = paste0(Genotype, " (n=", n, ")")
+  )
+
+# ---- Attach facet labels back to complete_data, preserving genotype order ----
+complete_data <- complete_data %>%
+  left_join(cor_by_genotype %>% select(Genotype, facet_label), by = "Genotype") %>%
+  mutate(facet_label = factor(
+    facet_label,
+    levels = cor_by_genotype$facet_label[order(match(cor_by_genotype$Genotype, geno_order))]
+  ))
+
+# ---- Plot ----
+ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_Base)) +
+  geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
+  geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
+  facet_wrap(~ facet_label) +
+  labs(
+    title = "Meg3 RNA-cloud vs. Baseline Amplitude",
+    subtitle = "By genotype",
+    x = "Meg3_norm",
+    y = "Amplitude_Base"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    plot.subtitle = element_text(size = 11, color = "grey40", hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 10.5),
+    strip.background = element_rect(fill = "grey93", color = NA),
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  ) +
+  geom_text(
+    data = complete_data %>% distinct(facet_label, Genotype) %>%
+      left_join(cor_by_genotype %>% select(Genotype, label), by = "Genotype"),
+    aes(x = -Inf, y = Inf, label = label),
+    hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
+    inherit.aes = FALSE
+  )
 
 
 
 
+
+
+# Recalculate stats specifically for Amplitude_F4
+cor_by_genotype_F4 <- complete_data %>%
+  group_by(Genotype) %>%
+  summarise(
+    r = round(cor(Amplitude_F4, Meg3_norm, use = "complete.obs"), 2),
+    p = signif(cor.test(Amplitude_F4, Meg3_norm)$p.value, 2),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(label = paste0("r = ", r, ", p = ", p))
+
+ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_F4)) +
+  geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
+  geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
+  facet_wrap(~ facet_label) +
+  labs(
+    title = "Meg3 RNA_cloud vs. First 4 Amplitude",
+    subtitle = "By genotype",
+    x = "Meg3_norm",
+    y = "Amplitude_F4"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    plot.subtitle = element_text(size = 11, color = "grey40", hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 10.5),
+    strip.background = element_rect(fill = "grey93", color = NA),
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  ) +
+  geom_text(
+    data = complete_data %>% distinct(facet_label, Genotype) %>%
+      left_join(cor_by_genotype_F4 %>% select(Genotype, label), by = "Genotype"),
+    aes(x = -Inf, y = Inf, label = label),
+    hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
+    inherit.aes = FALSE
+  )
+
+
+
+
+
+
+# Recalculate correlation stats specifically for Amplitude_L4
+cor_by_genotype_L4 <- complete_data %>%
+  group_by(Genotype) %>%
+  summarise(
+    r = round(cor(Amplitude_L4, Meg3_norm, use = "complete.obs"), 2),
+    p = signif(cor.test(Amplitude_L4, Meg3_norm)$p.value, 2),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(label = paste0("r = ", r, ", p = ", p))
+
+ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_L4)) +
+  geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
+  geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
+  facet_wrap(~ facet_label) +
+  labs(
+    title = "Meg3 RNA-cloud vs. Last 4 Amplitude",
+    subtitle = "By genotype",
+    x = "Meg3_norm",
+    y = "Amplitude_L4"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    plot.subtitle = element_text(size = 11, color = "grey40", hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 10.5),
+    strip.background = element_rect(fill = "grey93", color = NA),
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  ) +
+  geom_text(
+    data = complete_data %>% distinct(facet_label, Genotype) %>%
+      left_join(cor_by_genotype_L4 %>% select(Genotype, label), by = "Genotype"),
+    aes(x = -Inf, y = Inf, label = label),
+    hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
+    inherit.aes = FALSE
+  )
+
+
+
+
+
+
+
+
+bind_rows(
+  cor_by_genotype %>% mutate(Phase = "Baseline"),
+  cor_by_genotype_F4 %>% mutate(Phase = "First 4"),
+  cor_by_genotype_L4 %>% mutate(Phase = "Last 4")
+) %>%
+  select(Phase, Genotype, r, p, n) %>%
+  arrange(Genotype, Phase)
 
 
