@@ -3,7 +3,7 @@ library(dplyr)
 library(readxl)
 library(tibble)
 
-
+setwd("/Users/judyabuel/Desktop/GitHub/cloud_amp_correlation/")
 
 # This contains image anlaysis using high-content imager
 cloud <- read_csv("data/combined_data.csv", show_col_types = FALSE)
@@ -401,48 +401,37 @@ sum(!is.na(merged_data$Meg3_norm))
 
 write_csv(merged_data, "data/merged_amp_cloud_data.csv")
 
-
-
 complete_data <- merged_data %>%
   filter(!is.na(Amplitude_Base) & !is.na(Meg3_norm))
 
 nrow(complete_data)  # should be ~31
 
-cor_test <- cor.test(complete_data$Amplitude_Base, complete_data$Meg3_norm)
-cor_test
-
-
-# This is to check if I need to normalize my data by log transform
-hist(complete_data$Meg3_norm)
-hist(complete_data$Amplitude_Base)
-shapiro.test(complete_data$Meg3_norm)
-shapiro.test(complete_data$Amplitude_Base)
 
 
 
 
 
 
+#------------------------------------------------
 
-
-
-
-library(ggplot2)
-library(dplyr)
+df <- read_csv("data/merged_amp_cloud_data.csv") %>%
+  filter(Cycle == 12)
 
 # ---- Set genotype order ----
 geno_order <- c("WT/WT", "HET/WT", "HET/TG")
-
-complete_data <- complete_data %>%
-  mutate(Genotype = factor(Genotype, levels = geno_order))
+df <- df %>%
+  filter(!is.na(Genotype)) %>%
+  mutate(Genotype = factor(Genotype, levels = geno_order)) %>%
+  filter(!is.na(Genotype))
 
 # ---- Per-genotype correlation stats ----
-cor_by_genotype <- complete_data %>%
+cor_by_genotype <- df %>%
   group_by(Genotype) %>%
+  filter(sum(complete.cases(Amplitude_Base, Meg3_norm)) >= 3) %>%
   summarise(
     r = round(cor(Amplitude_Base, Meg3_norm, use = "complete.obs"), 2),
     p = signif(cor.test(Amplitude_Base, Meg3_norm)$p.value, 2),
-    n = n(),
+    n = sum(complete.cases(Amplitude_Base, Meg3_norm)),
     .groups = "drop"
   ) %>%
   mutate(
@@ -450,8 +439,9 @@ cor_by_genotype <- complete_data %>%
     facet_label = paste0(Genotype, " (n=", n, ")")
   )
 
-# ---- Attach facet labels back to complete_data, preserving genotype order ----
-complete_data <- complete_data %>%
+# ---- Attach facet labels back to df ----
+df <- df %>%
+  select(-any_of("facet_label")) %>%
   left_join(cor_by_genotype %>% select(Genotype, facet_label), by = "Genotype") %>%
   mutate(facet_label = factor(
     facet_label,
@@ -459,15 +449,18 @@ complete_data <- complete_data %>%
   ))
 
 # ---- Plot ----
-ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_Base)) +
+library(ggplot2)
+library(dplyr)
+
+ggplot(df, aes(x = Meg3_norm, y = Amplitude_Base)) +
   geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
   geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
   facet_wrap(~ facet_label) +
   labs(
     title = "Meg3 RNA-cloud vs. Baseline Amplitude",
-    subtitle = "By genotype",
-    x = "Meg3_norm",
-    y = "Amplitude_Base"
+    subtitle = "Cycle 12 only, by genotype",
+    x = "Meg3 RNA cloud size",
+    y = "Amplitude Baseline"
   ) +
   theme_minimal(base_size = 12) +
   theme(
@@ -480,13 +473,12 @@ ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_Base)) +
     panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
   ) +
   geom_text(
-    data = complete_data %>% distinct(facet_label, Genotype) %>%
+    data = df %>% distinct(facet_label, Genotype) %>%
       left_join(cor_by_genotype %>% select(Genotype, label), by = "Genotype"),
     aes(x = -Inf, y = Inf, label = label),
     hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
     inherit.aes = FALSE
   )
-
 
 
 
@@ -575,13 +567,7 @@ ggplot(complete_data, aes(x = Meg3_norm, y = Amplitude_L4)) +
     inherit.aes = FALSE
   )
 
-
-
-
-
-
-
-
+#---------------
 bind_rows(
   cor_by_genotype %>% mutate(Phase = "Baseline"),
   cor_by_genotype_F4 %>% mutate(Phase = "First 4"),
@@ -591,3 +577,195 @@ bind_rows(
   arrange(Genotype, Phase)
 
 
+
+
+
+
+
+#-------TO GENERATE ALL THREE PLOTS-----------------------------------
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)   # install.packages("patchwork") if you don't have it
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+# ---- Load & filter once ----
+df_base <- read_csv("data/merged_amp_cloud_data.csv") %>%
+  filter(Cycle == 12)
+
+geno_order <- c("WT/WT", "HET/WT", "HET/TG")
+
+df_base <- df_base %>%
+  filter(!is.na(Genotype)) %>%
+  mutate(Genotype = factor(Genotype, levels = geno_order)) %>%
+  filter(!is.na(Genotype))
+
+# ---- Reusable function ----
+plot_amp_vs_meg3 <- function(data, amp_col, plot_title = NULL) {
+  
+  data <- data %>%
+    rename(amp_value = all_of(amp_col))
+  
+  cor_by_genotype <- data %>%
+    group_by(Genotype) %>%
+    filter(sum(complete.cases(amp_value, Meg3_norm)) >= 3) %>%
+    summarise(
+      r = round(cor(amp_value, Meg3_norm, use = "complete.obs"), 2),
+      p = signif(cor.test(amp_value, Meg3_norm)$p.value, 2),
+      n = sum(complete.cases(amp_value, Meg3_norm)),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      label = paste0("r = ", r, ", p = ", p),
+      facet_label = paste0(Genotype, " (n=", n, ")")
+    )
+  
+  data <- data %>%
+    select(-any_of("facet_label")) %>%
+    left_join(cor_by_genotype %>% select(Genotype, facet_label), by = "Genotype") %>%
+    mutate(facet_label = factor(
+      facet_label,
+      levels = cor_by_genotype$facet_label[order(match(cor_by_genotype$Genotype, geno_order))]
+    ))
+  
+  ggplot(data, aes(x = Meg3_norm, y = amp_value)) +
+    geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
+    geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
+    facet_wrap(~ facet_label) +
+    labs(
+      title = plot_title %||% paste("Meg3 RNA-cloud vs.", amp_col),
+      subtitle = "Cycle 12 only, by genotype",
+      x = "Meg3 RNA cloud size",
+      y = amp_col
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14, hjust = 0),
+      plot.subtitle = element_text(size = 11, color = "grey40", hjust = 0),
+      panel.grid.minor = element_blank(),
+      strip.text = element_text(face = "bold", size = 10.5),
+      strip.background = element_rect(fill = "grey93", color = NA),
+      panel.spacing = unit(1, "lines"),
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    ) +
+    geom_text(
+      data = data %>% distinct(facet_label, Genotype) %>%
+        left_join(cor_by_genotype %>% select(Genotype, label), by = "Genotype"),
+      aes(x = -Inf, y = Inf, label = label),
+      hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
+      inherit.aes = FALSE
+    )
+}
+
+# ---- Generate all three plots ----
+plot_Base <- plot_amp_vs_meg3(df_base, "Amplitude_Base", "Meg3 RNA-cloud vs. Amplitude_Base")
+plot_F4   <- plot_amp_vs_meg3(df_base, "Amplitude_F4",   "Meg3 RNA-cloud vs. Amplitude_F4")
+plot_L4   <- plot_amp_vs_meg3(df_base, "Amplitude_L4",   "Meg3 RNA-cloud vs. Amplitude_L4")
+
+# ---- Combine vertically (stacked) ----
+combined_plot <- plot_Base / plot_F4 / plot_L4
+
+combined_plot
+
+# ---- Save combined figure ----
+ggsave("Combined_Amplitude_vs_Meg3.png", combined_plot, width = 9, height = 15, dpi = 300)
+
+
+
+
+
+
+
+#-----------This is specifically to do correlation on 11:11
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+# ---- Load & filter for Cycle 11 ----
+df_base <- read_csv("data/merged_amp_cloud_data.csv") %>%
+  filter(Cycle == 11)
+
+geno_order <- c("WT/WT", "HET/WT", "HET/TG")
+
+df_base <- df_base %>%
+  filter(!is.na(Genotype)) %>%
+  mutate(Genotype = factor(Genotype, levels = geno_order)) %>%
+  filter(!is.na(Genotype))
+
+# ---- Reusable function (same as before) ----
+plot_amp_vs_meg3 <- function(data, amp_col, plot_title = NULL, subtitle_text = "By genotype") {
+  
+  data <- data %>%
+    rename(amp_value = all_of(amp_col))
+  
+  cor_by_genotype <- data %>%
+    group_by(Genotype) %>%
+    filter(sum(complete.cases(amp_value, Meg3_norm)) >= 3) %>%
+    summarise(
+      r = round(cor(amp_value, Meg3_norm, use = "complete.obs"), 2),
+      p = signif(cor.test(amp_value, Meg3_norm)$p.value, 2),
+      n = sum(complete.cases(amp_value, Meg3_norm)),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      label = paste0("r = ", r, ", p = ", p),
+      facet_label = paste0(Genotype, " (n=", n, ")")
+    )
+  
+  data <- data %>%
+    select(-any_of("facet_label")) %>%
+    left_join(cor_by_genotype %>% select(Genotype, facet_label), by = "Genotype") %>%
+    mutate(facet_label = factor(
+      facet_label,
+      levels = cor_by_genotype$facet_label[order(match(cor_by_genotype$Genotype, geno_order))]
+    ))
+  
+  ggplot(data, aes(x = Meg3_norm, y = amp_value)) +
+    geom_point(size = 2.3, alpha = 0.75, color = "#2C5F8A") +
+    geom_smooth(method = "lm", se = TRUE, color = "#D9534F", fill = "grey85", linewidth = 0.9) +
+    facet_wrap(~ facet_label) +
+    labs(
+      title = plot_title %||% paste("Meg3 RNA-cloud vs.", amp_col),
+      subtitle = subtitle_text,
+      x = "Meg3 RNA cloud size",
+      y = amp_col
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14, hjust = 0),
+      plot.subtitle = element_text(size = 11, color = "grey40", hjust = 0),
+      panel.grid.minor = element_blank(),
+      strip.text = element_text(face = "bold", size = 10.5),
+      strip.background = element_rect(fill = "grey93", color = NA),
+      panel.spacing = unit(1, "lines"),
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    ) +
+    geom_text(
+      data = data %>% distinct(facet_label, Genotype) %>%
+        left_join(cor_by_genotype %>% select(Genotype, label), by = "Genotype"),
+      aes(x = -Inf, y = Inf, label = label),
+      hjust = -0.05, vjust = 1.5, size = 3.3, fontface = "bold", color = "black",
+      inherit.aes = FALSE
+    )
+}
+
+# ---- Generate all three plots for Cycle 11 ----
+plot_Base_c11 <- plot_amp_vs_meg3(df_base, "Amplitude_Base", "Meg3 RNA-cloud vs. Amplitude_Base", "Cycle 11 only, by genotype")
+plot_F4_c11   <- plot_amp_vs_meg3(df_base, "Amplitude_F4",   "Meg3 RNA-cloud vs. Amplitude_F4",   "Cycle 11 only, by genotype")
+plot_L4_c11   <- plot_amp_vs_meg3(df_base, "Amplitude_L4",   "Meg3 RNA-cloud vs. Amplitude_L4",   "Cycle 11 only, by genotype")
+
+# ---- View individually ----
+plot_Base_c11
+plot_F4_c11
+plot_L4_c11
+
+# ---- Combine vertically ----
+combined_plot_c11 <- plot_Base_c11 / plot_F4_c11 / plot_L4_c11
+combined_plot_c11
+
+# ---- Save ----
+ggsave("Combined_Amplitude_vs_Meg3_Cycle11.png", combined_plot_c11, width = 9, height = 15, dpi = 300)
